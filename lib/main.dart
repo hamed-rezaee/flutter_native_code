@@ -1,5 +1,5 @@
+import 'dart:async';
 import 'dart:developer' as dev;
-import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -34,7 +34,10 @@ class _HomePageState extends State<HomePage> {
   static const EventChannel _eventChannel =
       EventChannel('com.example.flutter_native_code/pressure_channel');
 
-  String sensorAvailable = 'Sensor not available';
+  String _sensorAvailable = 'Sensor not available';
+  double _pressure = 0;
+
+  StreamSubscription? _streamSubscription;
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -43,12 +46,29 @@ class _HomePageState extends State<HomePage> {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Text('Sensor Available: $sensorAvailable'),
+              Text('Sensor Available: $_sensorAvailable'),
               const SizedBox(height: 32),
               ElevatedButton(
                 onPressed: _isSensorAvailable,
                 child: const Text('Get sensor availability'),
-              )
+              ),
+              const SizedBox(height: 32),
+              Text('Sensor Pressure: $_pressure (hPa)'),
+              const SizedBox(height: 32),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  ElevatedButton(
+                    onPressed: _getSensorPressure,
+                    child: const Text('Get sensor pressure'),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: _stopSensorPressure,
+                    child: const Text('Stop sensor pressure'),
+                  )
+                ],
+              ),
             ],
           ),
         ),
@@ -59,13 +79,25 @@ class _HomePageState extends State<HomePage> {
       final bool result =
           await _methodChannel.invokeMethod('isSensorAvailable');
 
-      setState(() => sensorAvailable = result.toString());
+      setState(() => _sensorAvailable = result.toString());
     } on Exception catch (e) {
       dev.log('Failed to get sensor availability.', error: e);
 
       setState(
-        () => sensorAvailable = 'failed to get sensor availability.',
+        () => _sensorAvailable = 'failed to get sensor availability.',
       );
     }
+  }
+
+  void _getSensorPressure() async {
+    _streamSubscription = _eventChannel
+        .receiveBroadcastStream()
+        .listen((event) => setState(() => _pressure = event));
+  }
+
+  void _stopSensorPressure() {
+    _streamSubscription?.cancel();
+
+    setState(() => _pressure = 0);
   }
 }
